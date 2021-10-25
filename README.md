@@ -1,119 +1,16 @@
 
-# P5 TypeScript Starter
+# infrastructure based on https://github.com/Gaweph/p5-typescript-starter
 
-This project will quickly get you something working in [p5.js](https://p5js.org/) and [typescript](https://www.typescriptlang.org/).
+# to run, do an npm install then run npm start
 
-## Demo
+# this visual aims to visual a particle system that leverages a quad-tree in it's collision logic
 
-**[Click here for Demo](https://gaweph.github.io/p5-typescript-starter/)**
+# clicking on the screen will create a new particle with a variable size and speed
 
-![Demo](p5-typescript-demo.png?raw=true "Demo")
+# as more particles are added the quad tree will sub divide, each "cell" in the tree can hold a maximum of 2 particles before it divides into 4
 
-This demo is based on the [Regular Polygon](https://p5js.org/examples/form-regular-polygon.html) sketch available in the p5js examples.
+# the lines between each particle represent which particles are being compared to each render cycle to determine collision 
 
-## Getting Started
+# the color of the lines becomes more vibrant the closer 2 particles are to colliding
 
-### Installing
-
-```
-git clone https://github.com/Gaweph/p5-typescript-starter.git
-```
-
-```
-npm install
-```
-
-### Using
-
-```
-npm start
-```
-
-A local version will now be running on [localhost:3000](http://localhost:3000).
-
-## Advanced
-
-### Global and Instanced Modes
-
-P5 is able to run in either [global or instance mode](https://github.com/processing/p5.js/wiki/Global-and-instance-mode).
-
-This starter project uses **global mode** by default to bring it in line with most of the online resources provided by the project. 
-
-As stated on the P5 wiki:
-
-> While this is convenient (and friendlier) it's important to note that this can lead to problems and confusion down the road when mixing other JS libraries or trying to embed multiple p5 sketches on the same page. A safer, more advanced methodology is to create a p5 sketch as an object "instance".
-
-The following examples are both functionally the same.
-
-#### Global Mode
-
-```typescript
-let x = 100;
-let y = 100;
-
-function setup() {
-  createCanvas(windowWidth, windowHeight);
-}
-
-function draw() {
-  background(0);
-  fill(255);
-  rect(x, y, 50, 50);
-}
-```
-
-#### Instanced Mode
-
-```typescript
-var sketch = (p: p5) => {
-  this.x = 100;
-  this.y = 100;
-  p.setup = () => {
-    p.createCanvas(p.windowWidth, p.windowHeight);
-  };
-
-  p.draw = () => {
-    p.background(0);
-    p.fill(255);
-    p.rect(this.x, this.y, 50, 50);
-  };
-};
-
-new p5(sketch);
-```
-
-This starter project will work with either mode, feel free to experiment with both.
-
-### Using External Libraries
-
-To use an external library, e.g. [qrcode-generator](https://www.npmjs.com/package/qrcode-generator).
-
-1. Install the library with `npm install --save-dev qrcode-generator`.
-
-2. Add a `script` tag to your [index.html](index.html).
-
-   ```html
-   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
-   ```
-
-3. Import via [global.d.ts](global.d.ts).
-
-   ```typescript
-   import qrcode = require('qrcode-generator');
-   ```
-
-4. Use in [sketch/sketch.ts](sketch/sketch.ts).
-
-   ```typescript
-   var qr = qrcode(4, 'L');
-   qr.addData('https://github.com/Gaweph/p5-typescript-starter');
-   qr.make();
-
-   text(qr.createASCII(), 1, 1);
-   ```
-
-See [dblock/p5qr](https://github.com/dblock/p5qr) for a working sample.
-
-## Copyright and License
-
-MIT License, see [LICENSE](LICENSE) for details.
+# overall the quad tree lets us optimize our collision detection as we can greatly reduce the number of comparisons we need to run each render cycle (n log n down from n^2). It's also pretty cool to look at :)

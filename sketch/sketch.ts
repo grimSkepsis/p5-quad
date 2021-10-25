@@ -4,29 +4,40 @@
 let VIEW_PORT_WIDTH = 800;
 let VIEW_PORT_HEIGHT = 500;
 
+const PARTICLE_COLOR = "#9072ad";
+const COLLISION_COLOR = "#ce81d4";
+const BG_COLOR = "#83BFE3";
+const RECT_COLOR = "#fff";
 const PARTICLE_WIDTH = 10;
+const PARTICLE_MASS_MULTIPLIER = 5;
+const PARTICLE_BASE_SPEED = 5;
+const PARTICLE_SIZE_VARIANCE = 20;
 const REFRESH_RATE = 60;
+
+//adjust to change the max number of particles a cell can hold before dividing
+const TREE_CAPACITY = 2;
 
 let particles: Particle[] = [];
 let currId = 0;
 
-// P5 WILL AUTOMATICALLY USE GLOBAL MODE IF A DRAW() FUNCTION IS DEFINED
 function setup() {
   createCanvas(windowWidth, windowHeight);
   rectMode(CENTER).noFill().frameRate(REFRESH_RATE);
 }
 
-// p5 WILL AUTO RUN THIS FUNCTION IF THE BROWSER WINDOW SIZE CHANGES
 function windowResized() {
   resizeCanvas(windowWidth, windowHeight);
 }
 
-// p5 WILL HANDLE REQUESTING ANIMATION FRAMES FROM THE BROWSER AND WIL RUN DRAW() EACH ANIMATION FROME
 function draw() {
   VIEW_PORT_WIDTH = windowWidth;
   VIEW_PORT_HEIGHT = windowHeight;
-  // CLEAR BACKGROUND
-  background("#fff");
+  background(BG_COLOR);
+
+  //array of potential collisions we will use later for visualizing lines between points
+  let potentialCollisions: Particle[][] = [];
+
+  //generate a new quad tree
   let quadTree = new QuadTree(
     new Rectangle(
       windowWidth / 2,
@@ -34,37 +45,61 @@ function draw() {
       windowWidth / 2,
       windowHeight / 2
     ),
-    2
+    TREE_CAPACITY
   );
+
+  //insert all of our particles into the new tree
   particles.forEach((p) => {
     quadTree.insert(p);
   });
-  particles = updateParticles(quadTree, particles);
-  let quadTreeRects = quadTree.getRenderingData();
-  quadTreeRects.forEach((r) => {
-    stroke(0);
+
+  //update particle positions/handle collisions
+  particles = updateParticles(quadTree, particles, potentialCollisions);
+
+  //render quad tree visual
+  quadTree.getRenderingData().forEach((r) => {
+    stroke(RECT_COLOR);
     strokeWeight(1);
     noFill();
     smooth();
     rect(r.x, r.y, r.dimX * 2, r.dimY * 2);
   });
+  
+  //render which points are being compared in a given update cycle, make color more vibrant the closer 2 particles are too a collision
+  potentialCollisions.forEach((pts) => {
+    for(let i = 0; i < pts.length - 1; i++) {
+      let dist = getParticleDistance(pts[i], pts[i + 1]);
+      let distToCol = pts[i].r + pts[i +1 ].r;
+      let rValue = Math.min(255, 5 * Math.floor(255 * (distToCol / dist)));
+      stroke(`rgb(${rValue}, 125, 200)`);
+      line(pts[i].x, pts[i].y, pts[i + 1].x, pts[i + 1].y);
+    }
+  });
+
+  //render particles
   particles.forEach((p) => {
     fill(color(p.c));
     noStroke();
     smooth();
     circle(p.x, p.y, p.r * 2);
   });
+  stroke(RECT_COLOR);
+  strokeWeight(1);
+
 }
 
+/**
+ * Whenever we click create a new point with a random velocity
+ */
 function mouseClicked(): void {
   const newParticle: Particle = {
     id: currId,
     x: mouseX, // Takes the pixel number to convert to number
     y: mouseY,
-    dx: 5 * (0.5 - Math.random()),
-    dy: 5 * (0.5 - Math.random()),
-    c: "red",
-    r: PARTICLE_WIDTH,
+    dx: PARTICLE_BASE_SPEED * (0.5 - Math.random()),
+    dy: PARTICLE_BASE_SPEED * (0.5 - Math.random()),
+    c: PARTICLE_COLOR,
+    r: PARTICLE_WIDTH + PARTICLE_SIZE_VARIANCE * Math.random(),
   };
   currId++;
   particles.push(newParticle);
@@ -84,16 +119,33 @@ type Particle = {
   c: string;
 };
 
+/**
+ * Returns the bounding box for a particle
+ * @param p 
+ * @returns 
+ */
 function getParticleBounds(p: Particle): Rectangle {
   return new Rectangle(p.x, p.y, p.r, p.r);
 }
 
+/**
+ * Returns true if 2 particles have overlapped
+ * @param p1 
+ * @param p2 
+ * @returns 
+ */
 function particlesHaveCollided(p1: Particle, p2: Particle) {
   const INTERSECTION_DIST = p1.r + p2.r;
   const ACTUAL_DIST = getParticleDistance(p1, p2);
   return ACTUAL_DIST <= INTERSECTION_DIST;
 }
 
+/**
+ * Gets the distance between 2 Particles
+ * @param p1 
+ * @param p2 
+ * @returns 
+ */
 function getParticleDistance(p1: Particle, p2: Particle): number {
   return Math.sqrt(Math.pow(p1.x - p2.x, 2) + Math.pow(p1.y - p2.y, 2));
 }
@@ -109,11 +161,17 @@ function getParticleDistance(p1: Particle, p2: Particle): number {
  */
 function getNextX(p: Particle): { x: number; dx: number } {
   const returnVal = { x: p.x + p.dx, dx: p.dx };
+  //if we are outside the bounds already, reset poition
+  if (p.x + p.r > VIEW_PORT_WIDTH) {
+    returnVal.x = VIEW_PORT_WIDTH - p.r;
+  } else if (p.x - p.r < 0) {
+    p.x = p.r;
+  }
+
+  //if we are about to clip the edge, reverse velocity
   if (p.dx < 0 && p.x + p.dx - p.r < 0) {
-    returnVal.x = p.r;
     returnVal.dx = -returnVal.dx;
   } else if (p.dx > 0 && p.x + p.dx + p.r > VIEW_PORT_WIDTH) {
-    returnVal.x = VIEW_PORT_WIDTH - p.r;
     returnVal.dx = -returnVal.dx;
   }
   return returnVal;
@@ -126,11 +184,17 @@ function getNextX(p: Particle): { x: number; dx: number } {
  */
 function getNextY(p: Particle): { y: number; dy: number } {
   const returnVal = { y: p.y + p.dy, dy: p.dy };
+  //if we are outside the bounds already, reset poition
+  if (p.y + p.r > VIEW_PORT_HEIGHT) {
+    returnVal.y = VIEW_PORT_HEIGHT - p.r;
+  } else if (p.y - p.r < 0) {
+    p.y = p.r;
+  }
+
+  //if we are about to clip the edge, reverse velocity
   if (p.dy < 0 && p.y + p.dy - p.r < 0) {
-    returnVal.y = p.r;
     returnVal.dy = -returnVal.dy;
   } else if (p.dy > 0 && p.y + p.dy + p.r > VIEW_PORT_HEIGHT) {
-    returnVal.y = VIEW_PORT_HEIGHT - p.r;
     returnVal.dy = -returnVal.dy;
   }
   return returnVal;
@@ -142,10 +206,11 @@ function getNextY(p: Particle): { y: number; dy: number } {
  * @param quad
  * @returns
  */
-function checkParticleCollisions(p: Particle, quad: QuadTree): Particle {
+function checkParticleCollisions(p: Particle, quad: QuadTree, potentialCollisions: Particle[][]): Particle {
   const collidedParticles: Particle[] = <Particle[]>(
     quad.query(getParticleBounds(p))
   );
+  potentialCollisions.push(collidedParticles);
   let hasCollided = false;
   for (let i = 0; i < collidedParticles.length; i++) {
     const colP = collidedParticles[i];
@@ -157,7 +222,7 @@ function checkParticleCollisions(p: Particle, quad: QuadTree): Particle {
 
   return {
     ...p,
-    c: hasCollided ? "blue" : "red",
+    c: hasCollided ? COLLISION_COLOR : PARTICLE_COLOR,
   };
 }
 
@@ -176,12 +241,15 @@ function collideParticles(p1: Particle, p2: Particle): void {
   const speed =
     vRelativeVelocity.x * vCollisionNorm.x +
     vRelativeVelocity.y * vCollisionNorm.y;
+  const p1Mass = p1.r * 4/3 * Math.PI * Math.pow(PARTICLE_MASS_MULTIPLIER, 3);
+  const p2Mass = p2.r * 4/3 * Math.PI * Math.pow(PARTICLE_MASS_MULTIPLIER, 3);
+  const impulse = 2 * speed / (p1Mass + p2Mass);
 
   if (speed > 0) return;
-  p1.dx -= speed * vCollisionNorm.x;
-  p1.dy -= speed * vCollisionNorm.y;
-  p2.dx += speed * vCollisionNorm.x;
-  p2.dy += speed * vCollisionNorm.y;
+  p1.dx -= impulse * p2Mass * vCollisionNorm.x;
+  p1.dy -= impulse * p2Mass * vCollisionNorm.y;
+  p2.dx += impulse * p1Mass * vCollisionNorm.x;
+  p2.dy += impulse * p1Mass * vCollisionNorm.y;
 }
 
 /**
@@ -190,9 +258,9 @@ function collideParticles(p1: Particle, p2: Particle): void {
  * @param particles
  * @returns
  */
-function updateParticles(quad: QuadTree, particles: Particle[]): Particle[] {
+function updateParticles(quad: QuadTree, particles: Particle[], potentialCollisions: Particle[][]): Particle[] {
   const updatedParticles = particles
-    .map((p) => checkParticleCollisions(p, quad))
+    .map((p) => checkParticleCollisions(p, quad, potentialCollisions))
     .map((p) => {
       return {
         ...p,
@@ -273,7 +341,7 @@ class Rectangle {
   public overlaps(rect: Rectangle): boolean {
     const [top, right, bot, left] = this.edges;
     const [oTop, oRight, oBot, oLeft] = rect.edges;
-    return !(oBot < top || oTop > oBot || oLeft > right || oRight < oLeft);
+    return !(oBot < top || oTop > bot || oLeft > right || oRight < left);
   }
 }
 
