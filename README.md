@@ -1,6 +1,3 @@
-
-# infrastructure based on https://github.com/Gaweph/p5-typescript-starter
-
 # to run:
 
 to run, do an npm install then "run npm start"
@@ -18,3 +15,9 @@ the lines between each particle represent which particles are being compared to 
 the color of the lines becomes more vibrant the closer 2 particles are to colliding
 
 overall the quad tree lets us optimize our collision detection as we can greatly reduce the number of comparisons we need to run each render cycle (n log n down from n^2). It's also pretty cool to look at :)
+
+
+# credits
+ infrastructure based on https://github.com/Gaweph/p5-typescript-starter
+
+ physics logic based on https://spicyyoghurt.com/tutorials/html5-javascript-game-development/collision-detection-physics
