@@ -1,6 +1,6 @@
 # to run:
 
-to run, do an npm install then "run npm start"
+to run, do an npm install then "npm run start"
 
 # goal:
 
